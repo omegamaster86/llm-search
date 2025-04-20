@@ -1,21 +1,66 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { pool, redis } from '@/lib/db'
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+
+// 検索結果をキャッシュする時間（秒）
+const CACHE_DURATION = 3600
+
+async function verifyToken(token: string): Promise<number | null> {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: number }
+    return decoded.userId
+  } catch {
+    return null
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const { query } = await request.json()
+    const token = request.headers.get('Authorization')?.split(' ')[1]
+    const userId = token ? await verifyToken(token) : null
 
-    // 検索ロジックの実装
-    const searchResults = await prisma.searchHistory.create({
-      data: {
-        query,
-        result: `検索結果: ${query}に関する情報です。`, // 実際の検索ロジックに置き換え
-      },
-    })
+    // キャッシュをチェック
+    const cacheKey = `search:${query}`
+    const cachedResult = await redis.get(cacheKey)
+    
+    if (cachedResult) {
+      // 検索履歴を保存（キャッシュヒット時も）
+      if (userId) {
+        await pool.execute(
+          'INSERT INTO search_history (user_id, query, result) VALUES (?, ?, ?)',
+          [userId, query, cachedResult]
+        )
+      }
+
+      return NextResponse.json({
+        role: 'assistant',
+        content: cachedResult,
+        cached: true,
+      })
+    }
+
+    // 実際の検索ロジックを実装
+    // ここでは簡単な例として、クエリに基づいて結果を生成
+    const searchResult = await performSearch(query)
+
+    // 結果をキャッシュ
+    await redis.setex(cacheKey, CACHE_DURATION, searchResult)
+
+    // 検索履歴を保存
+    if (userId) {
+      await pool.execute(
+        'INSERT INTO search_history (user_id, query, result) VALUES (?, ?, ?)',
+        [userId, query, searchResult]
+      )
+    }
 
     return NextResponse.json({
       role: 'assistant',
-      content: searchResults.result,
+      content: searchResult,
+      cached: false,
     })
   } catch (error) {
     console.error('Search error:', error)
@@ -24,4 +69,19 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
+}
+
+// 検索ロジックの実装
+async function performSearch(query: string): Promise<string> {
+  // ここに実際の検索ロジックを実装
+  // 例：データベース検索、外部APIコール、全文検索エンジンの利用など
+  
+  // 簡単な例として、クエリに基づいて結果を生成
+  const searchResults = [
+    `「${query}」に関する主要な情報`,
+    `「${query}」の詳細説明`,
+    `「${query}」に関連する追加情報`,
+  ].join('\n\n')
+
+  return searchResults
 } 
