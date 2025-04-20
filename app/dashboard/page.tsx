@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -9,10 +10,19 @@ interface Message {
 }
 
 const Dashboard = () => {
+  const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 認証チェック
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      router.push('/')
+    }
+  }, [router])
 
   // メッセージ履歴の永続化
   useEffect(() => {
@@ -39,15 +49,21 @@ const Dashboard = () => {
     setInput('')
 
     try {
+      const token = localStorage.getItem('token')
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ query: input }),
       })
 
       if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/')
+          return
+        }
         throw new Error('検索に失敗しました')
       }
 
@@ -60,8 +76,25 @@ const Dashboard = () => {
     }
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('chatMessages')
+    router.push('/')
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      {/* ヘッダー */}
+      <div className="bg-white shadow p-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold">社内検索システム</h1>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 text-sm text-red-600 hover:text-red-700"
+        >
+          ログアウト
+        </button>
+      </div>
+
       {/* メッセージ履歴エリア */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { pool, redis } from '../../../lib/db'
+import { search } from '../../../lib/search'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
@@ -42,9 +43,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // 実際の検索ロジックを実装
-    // ここでは簡単な例として、クエリに基づいて結果を生成
-    const searchResult = await performSearch(query)
+    // 統合検索を実行
+    const searchResult = await search(query)
 
     // 結果をキャッシュ
     await redis.setex(cacheKey, CACHE_DURATION, searchResult)
@@ -69,19 +69,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
-// 検索ロジックの実装
-async function performSearch(query: string): Promise<string> {
-  // ここに実際の検索ロジックを実装
-  // 例：データベース検索、外部APIコール、全文検索エンジンの利用など
-  
-  // 簡単な例として、クエリに基づいて結果を生成
-  const searchResults = [
-    `「${query}」に関する主要な情報`,
-    `「${query}」の詳細説明`,
-    `「${query}」に関連する追加情報`,
-  ].join('\n\n')
-
-  return searchResults
 } 
