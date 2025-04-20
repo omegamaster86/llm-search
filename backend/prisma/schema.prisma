@@ -1,0 +1,16 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model SearchHistory {
+  id        Int      @id @default(autoincrement())
+  query     String
+  result    String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+} 
