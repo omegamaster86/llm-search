@@ -1,7 +1,7 @@
+import jwt from 'jsonwebtoken'
 import { NextResponse } from 'next/server'
 import { pool, redis } from '../../../lib/db'
 import { search } from '../../../lib/search'
-import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
